@@ -1,0 +1,287 @@
+<script>
+    import * as Card from "$lib/components/ui/card";
+    import * as Tabs from "$lib/components/ui/tabs";
+    import { Button } from "$lib/components/ui/button";
+    import { Input } from "$lib/components/ui/input";
+    import { Label } from "$lib/components/ui/label";
+    import { onMount } from "svelte";
+    import { getPublicClient } from "@wagmi/core";
+    import { wagmiAdapter } from "$lib/appkit";
+
+    import { connected, signerAddress } from "$lib/store";
+    import * as format from "$lib/format";
+    import * as tokenContract from "$lib/contracts/token";
+    import * as slapflip from "$lib/contracts/slapflip"; 
+    import { formatEther, parseEther } from 'viem';
+    import { SLAPFLIP_ADDRESS } from "$lib/config";
+
+    import HEADER_IMAGE from "$lib/assets/logo.webp";
+
+    let tokenBalance = $state(null);
+    let nativeBalance = $state(null);
+    let symbol = $state("");
+    let allowance = $state(null);
+    let slapAmount = $state(100);
+    let avaxAmount = $state(1)
+    let toSlap = $state("");
+    let maxSlap = $state(null);
+    let maxSlapNativeAmount = $state(null);
+    let amountError = $state("");
+    let selectedTab = $state("avax");
+    let isProcessing = $state(false);
+    let transactionError = $state("");
+
+    $effect(() => {
+        if (selectedTab === "token" && slapAmount) {
+            try {
+                const amount = parseEther(slapAmount.toString());
+                
+                if (maxSlap && amount > maxSlap) {
+                    amountError = `Amount exceeds maximum slap of ${format.wei(maxSlap)} SLAP`;
+                } else {
+                    amountError = "";
+                }
+            } catch (e) {
+                amountError = "Invalid amount";
+            }
+        } else if (selectedTab === "avax" && avaxAmount) {
+            try {
+                const amount = parseEther(avaxAmount.toString());
+                
+                if (maxSlapNativeAmount && amount > maxSlapNativeAmount) {
+                    amountError = `Amount exceeds maximum slap of ${format.wei(maxSlapNativeAmount)} AVAX`;
+                } else {
+                    amountError = "";
+                }
+            } catch (e) {
+                amountError = "Invalid amount";
+            }
+        } else {
+            amountError = "";
+        }
+    });
+
+    const update = async () => {
+        if ($connected) {
+            try {
+                const [native, tokenBal, allowanceVal, maxSlapVal, maxSlapNativeVal] = await Promise.all([
+                    getPublicClient(wagmiAdapter.wagmiConfig).getBalance({ address: $signerAddress }),
+                    tokenContract.balanceOf($signerAddress),
+                    tokenContract.allowance($signerAddress, SLAPFLIP_ADDRESS),
+                    slapflip.maxSlap(),
+                    slapflip.maxSlapNative()
+                ]);
+
+                nativeBalance = native;
+                tokenBalance = tokenBal;
+                symbol = await tokenContract.symbol();
+                allowance = allowanceVal;
+                maxSlap = maxSlapVal;
+                maxSlapNativeAmount = maxSlapNativeVal;
+            } catch (error) {
+                console.error("Error updating balances:", error);
+            }
+        }
+    };
+
+    const handleApprove = async () => {
+        if ($connected) {
+            try {
+                isProcessing = true;
+                transactionError = "";
+                
+                await tokenContract.approve(
+                    SLAPFLIP_ADDRESS,
+                    BigInt(2) ** BigInt(256) - BigInt(1),
+                );
+                
+                await update();
+            } catch (error) {
+                console.error("Approval failed:", error);
+                transactionError = "Failed to approve SLAP token. Please try again.";
+            } finally {
+                isProcessing = false;
+            }
+        }
+    };
+
+    const handleSlap = async () => {
+        if ($connected) {
+            try {
+                isProcessing = true;
+                transactionError = "";
+                
+                const targetAddress = toSlap || "0x0000000000000000000000000000000000000000";
+                
+                if (selectedTab === "token") {
+                    await slapflip.slapWithToken(targetAddress, parseEther(slapAmount.toString()));
+                } else {
+                    await slapflip.slapWithNative(
+                        targetAddress, 
+                        parseEther(avaxAmount.toString())
+                    );
+                }
+                
+                await update();
+                
+                // Clear input after successful slap
+                toSlap = "";
+            } catch (error) {
+                console.error("Slap failed:", error);
+                transactionError = "Failed to slap. Please try again.";
+            } finally {
+                isProcessing = false;
+            }
+        }
+    };
+
+    onMount(async () => {
+        if ($connected) {
+            await update();
+        }
+        setInterval(update, 7777);
+    });
+</script>
+
+<Card.Root>
+    <Card.Header>
+        <img src={HEADER_IMAGE} class="max-w-xs mx-auto py-4 sm:py-8 w-full" alt="SLAP" />
+    </Card.Header>
+    <Card.Content>
+        <Tabs.Root value={selectedTab} class="w-full" onValueChange={(value) => selectedTab = value}>
+            <Tabs.List class="grid w-full grid-cols-2">
+                <Tabs.Trigger value="avax">AVAX</Tabs.Trigger>
+                <Tabs.Trigger value="token">SLAP</Tabs.Trigger>
+            </Tabs.List>
+            
+            <Tabs.Content value="avax">
+                <div class="mt-4">
+                    <div class="flex w-full flex-col gap-1.5">
+                        <Label for="who" class="text-sm text-left">Slap</Label>
+                        <Input bind:value={toSlap} type="text" placeholder="Who to slap" />
+                    </div>
+                    
+                    <div class="flex w-full flex-col gap-1.5 mt-4">
+                        <div class="flex w-full items-center justify-between">
+                            <Label for="amount" class="text-sm">Amount</Label>
+                            <div class="text-right text-sm text-gray-700">
+                                Balance: <span class="font-medium">
+                                    {nativeBalance === null ? "~" : format.wei(nativeBalance)} AVAX
+                                </span>
+                            </div>
+                        </div>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 flex items-center pl-3">
+                                <img src="/tokens/avax.svg" alt="Icon" class="w-5 h-5" />
+                            </div>
+                            <Input 
+                                bind:value={avaxAmount} 
+                                type="text" 
+                                class="pl-10 pr-14 w-full {amountError ? 'border-red-500' : ''}" 
+                            />
+                            <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                <span class="text-gray-400 text-sm">AVAX</span>
+                            </div>
+                        </div>
+                        {#if amountError}
+                            <p class="text-red-500 text-sm mt-1 text-center">{amountError}</p>
+                        {/if}
+                        }
+                        {#if maxSlapNativeAmount}
+                            <p class="text-gray-400 text-sm mt-1 text-center">
+                                <span class="font-medium">Max amount:</span> {format.wei(maxSlapNativeAmount)} AVAX
+                            </p>
+                        {/if}
+                        }
+                    </div>
+                </div>
+            </Tabs.Content>
+
+            <Tabs.Content value="token">
+                <div class="mt-4">
+                    <div class="flex w-full flex-col gap-1.5">
+                        <Label for="who" class="text-left">Slap</Label>
+                        <Input bind:value={toSlap} type="text" placeholder="Who to slap" />
+                    </div>
+                    
+                    <div class="flex w-full flex-col gap-1.5 mt-4">
+                        <div class="flex w-full items-center justify-between">
+                            <Label for="amount" class="text-sm">Amount</Label>
+                            <div class="text-right text-sm text-gray-700">
+                                Balance: <span class="font-medium">
+                                    {tokenBalance === null ? "~" : format.wei(tokenBalance)}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 flex items-center pl-3">
+                                <img src="/tokens/slap.png" alt="Icon" class="w-5 h-5" />
+                            </div>
+                            <Input 
+                                bind:value={slapAmount} 
+                                type="text" 
+                                class="pl-10 pr-14 w-full {amountError ? 'border-red-500' : ''}" 
+                            />
+                            <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                <span class="text-gray-400 text-sm">SLAP</span>
+                            </div>
+                        </div>
+                        {#if amountError}
+                            <p class="text-red-500 text-sm mt-1 text-center">{amountError}</p>
+                        {/if}
+                        }
+                        {#if maxSlap}
+                            <p class="text-gray-400 text-sm mt-1 text-center">
+                                <span class="font-medium">Max amount:</span> {format.wei(maxSlap)} SLAP
+                            </p>
+                        {/if}
+                        }
+                    </div>
+                </div>
+            </Tabs.Content>
+        </Tabs.Root>
+        
+        {#if transactionError}
+            <div class="mt-4 p-3 bg-destructive/10 text-destructive text-sm rounded-md">
+                {transactionError}
+            </div>
+        {/if}
+        }
+    </Card.Content>
+    <Card.Footer>
+        {#if $connected}
+            {#if selectedTab === "token"}
+                {#if allowance && BigInt(allowance) >= BigInt(slapAmount || 0)}
+                    <Button 
+                        on:click={handleSlap} 
+                        class="w-full" 
+                        disabled={isProcessing || amountError}
+                    >
+                        {isProcessing ? 'Processing...' : 'Slap!'}
+                    </Button>
+                {:else}
+                    <Button 
+                        on:click={handleApprove} 
+                        class="w-full"
+                        disabled={isProcessing}
+                    >
+                        {isProcessing ? 'Approving...' : 'Approve SLAP'}
+                    </Button>
+                {/if}
+                }
+            {:else}
+                <Button 
+                    on:click={handleSlap} 
+                    class="w-full"
+                    disabled={isProcessing || amountError}
+                >
+                    {isProcessing ? 'Processing...' : 'Slap!'}
+                </Button>
+            {/if}
+            }
+        {:else}
+            <Button disabled class="w-full">Connect Wallet</Button>
+        {/if}
+        }
+    </Card.Footer>
+</Card.Root>
