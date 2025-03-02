@@ -1,40 +1,38 @@
 import { error, json } from '@sveltejs/kit';
 import { connectToDatabase } from '$lib/server/db.js';
+import * as config from "$lib/config";
+import { ADMIN_PASSWORD } from '$env/static/private';
 
-// List of admin addresses (should be moved to a secure location or database)
-const ADMIN_ADDRESSES = [
-    "0x06C8E296cc63B15b17878b673a9d58E71EA7508b", // Replace with actual admin addresses
-    // Add more admin addresses as needed
-];
+const ADMIN_ADDRESSES = config.ADMIN_ADDRESSES;
 
-/** @type {import('./$types').RequestHandler} */
 export async function POST({ request }) {
     try {
-        const { address, adminAddress } = await request.json();
+        const { address, adminPassword, adminAddress, tier } = await request.json();
         
         if (!address) {
             error(400, 'User address is required');
         }
         
-        if (!adminAddress) {
-            error(400, 'Admin address is required');
+        if (!adminPassword || adminPassword !== ADMIN_PASSWORD) {
+            error(400, 'Admin password is required');
         }
         
-        // Check if the requester is an admin
-        if (!ADMIN_ADDRESSES.includes(adminAddress)) {
-            error(403, 'Unauthorized access');
+        if (!tier) {
+            error(400, 'Tier selection is required');
         }
+        
         
         // Connect to the database
         const db = await connectToDatabase();
+        const whitelist = await db.collection('whitelist');
         
-        // Update the whitelist status
-        const result = await db.collection('whitelist').updateOne(
+        const result = whitelist.updateOne(
             { address },
             { 
                 $set: { 
                     isWhitelisted: true,
                     status: 'approved',
+                    tier: tier,
                     approvedAt: new Date(),
                     approvedBy: adminAddress
                 }
@@ -45,7 +43,7 @@ export async function POST({ request }) {
             error(404, 'Application not found');
         }
         
-        console.log(`Address ${address} approved by admin ${adminAddress}`);
+        console.log(`Address ${address} approved with tier ${tier}`);
         
         return json({ success: true });
     } catch (err) {

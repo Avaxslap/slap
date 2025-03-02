@@ -3,6 +3,8 @@
     import { Button } from "$lib/components/ui/button";
     import {Input} from "$lib/components/ui/input";
     import {Label} from "$lib/components/ui/label";
+    import { connected, signerAddress, userData } from '$lib/store';
+    
 </script>
 
 <Card.Root class="h-4/5">
@@ -13,9 +15,8 @@
         </Card.Description>
     </Card.Header>
     <Card.Content class="flex-grow overflow-y-auto h-[calc(100%-8rem)]">
-        <!-- Chat messages will go here -->
         <div class="space-y-4">
-            <!-- Placeholder for chat messages -->
+            
         </div>
     </Card.Content>
     <Card.Footer class="border-t pt-2">

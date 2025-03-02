@@ -3,6 +3,7 @@
     import { Button } from "$lib/components/ui/button";
     import { Input } from "$lib/components/ui/input";
     import { Label } from "$lib/components/ui/label";
+    import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "$lib/components/ui/select";
     import { connected, signerAddress } from "$lib/store";
     import { onMount } from "svelte";
     import TwitterIcon from "lucide-svelte/icons/twitter";
@@ -18,6 +19,23 @@
     let error = $state("");
     let applicationStatus = $state(""); // "pending", "approved", "denied", or empty string
     let applicationSubmitted = $state(false); // Track if they just submitted an application
+    let selectedTier = $state(""); // Track selected tier
+    let userTier = $state(""); // Track the tier the user has been approved for or requested
+
+    // Define whitelist tiers
+    const tiers = config.tiers;
+
+    // Function to get tier name from tier id
+    function getTierName(tierId) {
+        const tier = tiers.find(t => t.id === tierId);
+        return tier ? tier.name : "Unknown";
+    }
+
+    // Function to get tier price from tier id
+    function getTierPrice(tierId) {
+        const tier = tiers.find(t => t.id === tierId);
+        return tier ? tier.price : "";
+    }
 
     $effect(() => {
         if ($connected) {
@@ -43,6 +61,7 @@
             isWhitelisted = data.isWhitelisted;
             twitterConnected = data.twitterConnected;
             applicationStatus = data.status || "";
+            userTier = data.tier || "";
             
         } catch (err) {
             error = err.message || "Failed to check whitelist status";
@@ -54,6 +73,11 @@
 
     async function joinWhitelist() {
         try {
+            if (!selectedTier) {
+                error = "Please select a tier";
+                return;
+            }
+            
             isLoading = true;
             error = "";
             
@@ -61,7 +85,10 @@
             const response = await fetch('/api/whitelist/join', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ address: $signerAddress })
+                body: JSON.stringify({ 
+                    address: $signerAddress,
+                    tier: selectedTier
+                })
             });
             
             if (!response.ok) {
@@ -72,6 +99,7 @@
             // Update application status to pending
             applicationStatus = "pending";
             applicationSubmitted = true;
+            userTier = selectedTier;
             
         } catch (err) {
             error = err.message || "Failed to join whitelist";
@@ -200,9 +228,31 @@
                                         Pending Review
                                     </span>
                                 </div>
+                                {#if userTier}
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="font-medium">Requested Tier:</span>
+                                        <span class="text-primary font-medium">
+                                            {getTierName(userTier)} ({getTierPrice(userTier)})
+                                        </span>
+                                    </div>
+                                {/if}
                                 <p class="text-sm text-muted-foreground">
                                     Applications are typically reviewed within 24-48 hours. You'll receive an update once your application has been processed.
                                 </p>
+                            </div>
+                        {/if}
+                        
+                        {#if isWhitelisted || applicationStatus === "approved"}
+                            <div class="mt-6 bg-muted/50 p-4 rounded-lg w-full max-w-md">
+                                <h4 class="font-medium mb-2">Whitelist Details</h4>
+                                {#if userTier}
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="font-medium">Your Tier:</span>
+                                        <span class="text-primary font-medium">
+                                            {getTierName(userTier)} ({getTierPrice(userTier)})
+                                        </span>
+                                    </div>
+                                {/if}
                             </div>
                         {/if}
                     </div>
@@ -240,6 +290,30 @@
                             {/if}
                         </div>
                         
+                        {#if twitterConnected}
+                            <div class="p-4 border rounded-lg">
+                                <h3 class="font-medium mb-3">Select Whitelist Tier</h3>
+                                <div class="space-y-4">
+                                    <div class="grid grid-cols-1 gap-3">
+                                        {#each tiers as tier}
+                                            <div 
+                                                class="border rounded-lg p-3 cursor-pointer transition-colors hover:bg-muted/50 flex justify-between items-center {selectedTier === tier.id ? 'border-primary bg-primary/10' : ''}"
+                                                onclick={() => selectedTier = tier.id}
+                                            >
+                                                <div>
+                                                    <h4 class="font-medium">{tier.name}</h4>
+                                                    <p class="text-sm text-muted-foreground">{tier.price}</p>
+                                                </div>
+                                                {#if selectedTier === tier.id}
+                                                    <CheckCircleIcon class="h-5 w-5 text-primary" />
+                                                {/if}
+                                            </div>
+                                        {/each}
+                                    </div>
+                                </div>
+                            </div>
+                        {/if}
+                        
                         {#if error}
                             <div class="bg-destructive/10 text-destructive p-3 rounded-md text-sm">
                                 {error}
@@ -253,7 +327,7 @@
                 {#if $connected && !isWhitelisted && !applicationStatus && twitterConnected}
                     <Button 
                         class="w-full" 
-                        disabled={isLoading}
+                        disabled={isLoading || !selectedTier}
                         onclick={joinWhitelist}
                     >
                         {isLoading ? 'Processing...' : 'Join Whitelist'}

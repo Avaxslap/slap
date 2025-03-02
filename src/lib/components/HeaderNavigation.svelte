@@ -28,7 +28,7 @@
             AvaxSlap
         </a>
         
-        <div class="hidden md:flex items-center gap-6 ml-10">
+        <!--<div class="hidden md:flex items-center gap-6 ml-10">
             <a href="/" class="text-sm font-medium transition-colors hover:text-primary flex items-center gap-1">
                 <GamepadIcon class="h-4 w-4" />
                 Play
@@ -42,9 +42,11 @@
                 Whitelist
             </a>
         </div>
+        -->
     </nav>
     
     <!-- Mobile menu button -->
+     <!--
     <Sheet.Root>
         <Sheet.Trigger class="ml-2" asChild let:builder>
             <Button builders={[builder]} variant="outline" size="icon" class="md:hidden">
@@ -72,9 +74,10 @@
             </nav>
         </Sheet.Content>
     </Sheet.Root>
+-->
     
     <div class="ml-auto flex items-center gap-4">
-        <div class="hidden md:flex items-center gap-4">
+        <!--<div class="hidden md:flex items-center gap-4">
             <a href={config.TWITTER_URL} target="_blank" rel="noopener noreferrer" class="text-muted-foreground hover:text-foreground">
                 <img src={xIcon} alt="X" class="h-5 w-5" />
             </a>
@@ -82,6 +85,7 @@
                 <img src={tgIcon} alt="Telegram" class="h-5 w-5" />
             </a>
         </div>
+        -->
         <Connect />
     </div>
 </header>

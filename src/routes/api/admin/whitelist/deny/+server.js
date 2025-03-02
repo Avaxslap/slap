@@ -1,16 +1,14 @@
 import { error, json } from '@sveltejs/kit';
 import { connectToDatabase } from '$lib/server/db.js';
+import * as config from '$lib/config';
+import { ADMIN_PASSWORD } from '$env/static/private';
 
-// List of admin addresses (should be moved to a secure location or database)
-const ADMIN_ADDRESSES = [
-    "0x06C8E296cc63B15b17878b673a9d58E71EA7508b", // Replace with actual admin addresses
-    // Add more admin addresses as needed
-];
+const ADMIN_ADDRESSES = config.ADMIN_ADDRESSES;
 
 /** @type {import('./$types').RequestHandler} */
 export async function POST({ request }) {
     try {
-        const { address, adminAddress } = await request.json();
+        const { address, adminAddress, adminPassword } = await request.json();
         
         if (!address) {
             error(400, 'User address is required');
@@ -20,12 +18,14 @@ export async function POST({ request }) {
             error(400, 'Admin address is required');
         }
         
-        // Check if the requester is an admin
         if (!ADMIN_ADDRESSES.includes(adminAddress)) {
             error(403, 'Unauthorized access');
         }
+
+        if (!adminPassword || adminPassword !== ADMIN_PASSWORD) {
+            error(400, 'Admin password is required');
+        }
         
-        // Connect to the database
         const db = await connectToDatabase();
         
         // Update the whitelist status

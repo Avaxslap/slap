@@ -1,10 +1,8 @@
 import { error, json } from '@sveltejs/kit';
 import { connectToDatabase } from '$lib/server/db.js';
+import * as config from '$lib/config';
 
-// List of admin addresses (should be moved to a secure location or database)
-const ADMIN_ADDRESSES = [
-    "0x06C8E296cc63B15b17878b673a9d58E71EA7508b", "0x85E6cC88F3055b589eb1d4030863be2CFcc0763E", // Replace with actual admin addresses
-];
+const ADMIN_ADDRESSES = config.ADMIN_ADDRESSES;
 
 export async function GET({ request, url }) {
     try {

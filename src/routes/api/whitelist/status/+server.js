@@ -19,6 +19,7 @@ export async function GET({ url }) {
             isWhitelisted: whitelistRecord?.isWhitelisted || false,
             twitterConnected: whitelistRecord?.twitterConnected || false,
             twitterUsername: whitelistRecord?.twitterUsername || null,
+            tier: whitelistRecord?.tier || '',
             status: whitelistRecord?.status || "",
             appliedAt: whitelistRecord?.createdAt || null
         });
